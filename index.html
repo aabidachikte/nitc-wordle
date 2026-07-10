@@ -34,42 +34,67 @@
         ];
 
         // 1. Fetch random page titles from the MediaWiki API and isolate single words
-async function fetchCampusWords() {
-    // We append the target URL to an allorigins proxy to bypass browser security headers completely
-    const targetURL = "https://wiki.fosscell.org/api.php?action=query&list=random&rnnamespace=0&rnlimit=50&format=json";
-    const proxyURL = `https://api.allorigins.win/get?url=${encodeURIComponent(targetURL)}`;
-    
-    try {
-        const response = await fetch(proxyURL);
-        const jsonWrapper = await response.json();
+function fetchCampusWords() {
+    return new Promise((resolve) => {
+        // Create a unique temporary callback function name
+        const callbackName = 'mediawiki_jsonp_' + Math.floor(Math.random() * 100000);
         
-        // Allorigins returns the true response as a string inside jsonWrapper.contents
-        const data = JSON.parse(jsonWrapper.contents);
+        // Target URL using native MediaWiki JSONP callback parameter
+        const URL = `https://wiki.fosscell.org/api.php?action=query&list=random&rnnamespace=0&rnlimit=50&format=json&callback=${callbackName}`;
         
-        const rawTitles = data.query.random.map(page => page.title);
-        let validWords = [];
+        // Fall back automatically after 2 seconds if the server doesn't respond
+        const timeoutId = setTimeout(() => {
+            console.warn("⚠️ API timed out. Loading fallback list.");
+            delete window[callbackName];
+            resolve(FALLBACK_WORDS);
+        }, 2000);
 
-        rawTitles.forEach(title => {
-            const words = title.split(/[\s_]+/);
-            words.forEach(word => {
-                const cleanWord = word.replace(/[^a-zA-Z]/g, "").toLowerCase();
-                if (cleanWord.length >= 5 && cleanWord.length <= 8) {
-                    validWords.push(cleanWord);
+        // Define the global handler that the Wiki will execute instantly
+        window[callbackName] = function(data) {
+            clearTimeout(timeoutId);
+            delete window[callbackName];
+            document.getElementById(callbackName)?.remove();
+
+            try {
+                const rawTitles = data.query.random.map(page => page.title);
+                let validWords = [];
+
+                rawTitles.forEach(title => {
+                    // Split strings by spaces or underscores
+                    const words = title.split(/[\s_]+/);
+                    words.forEach(word => {
+                        const cleanWord = word.replace(/[^a-zA-Z]/g, "").toLowerCase();
+                        if (cleanWord.length >= 5 && cleanWord.length <= 8) {
+                            validWords.push(cleanWord);
+                        }
+                    });
+                });
+
+                console.log("🎯 Live Wiki Words Extracted:", validWords);
+
+                if (validWords.length === 0) {
+                    resolve(FALLBACK_WORDS);
+                } else {
+                    resolve(validWords);
                 }
-            });
-        });
+            } catch (err) {
+                console.error("Parser failed:", err);
+                resolve(FALLBACK_WORDS);
+            }
+        };
 
-        console.log("🎯 Successfully bypassed CORS! Wiki Words:", validWords);
-
-        if (validWords.length === 0) {
-            console.warn("⚠️ No wiki words met length rules. Injecting fallback array.");
-            return FALLBACK_WORDS;
-        }
-        return validWords;
-    } catch (error) {
-        console.error("❌ Both direct fetch and CORS proxy failed. Loading fallback list.", error);
-        return FALLBACK_WORDS;
-    }
+        // Inject the script tag to initiate the handshake
+        const script = document.createElement('script');
+        script.id = callbackName;
+        script.src = URL;
+        script.onerror = () => {
+            clearTimeout(timeoutId);
+            delete window[callbackName];
+            script.remove();
+            resolve(FALLBACK_WORDS);
+        };
+        document.body.appendChild(script);
+    });
 }
 
         // 2. Deterministically select today's word based on a calendar date seed hash
