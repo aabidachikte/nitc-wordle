@@ -19,22 +19,92 @@
 
     <h1>NITC Wordle</h1>
     <div id="grid"></div>
-    <input type="text" id="guessInput" placeholder="Type your guess..." autofocus>
+    <input type="text" id="guessInput" placeholder="Loading game data..." disabled autofocus>
     <p id="message"></p>
 
     <script type="module">
         import init, { WordleGame } from './pkg/nitc_wordle.js';
 
-        async function run() {
-            await init();
+        // 20 Hardcoded backup campus words as a safety net
+        const FALLBACK_WORDS = [
+            "hostel", "campus", "library", "btech", "mtech", 
+            "ragam", "tathva", "canteen", "server", "degree",
+            "faculty", "alumni", "ncccat", "nlhc", "sambhram",
+            "chanakya", "aryabhatta", "mbahall", "lhgnd", "mega"
+        ];
 
-            const game = new WordleGame();
+        // 1. Fetch random page titles from the MediaWiki API and isolate single words
+        async function fetchCampusWords() {
+            const URL = "https://wiki.fosscell.org/api.php?action=query&list=random&rnnamespace=0&rnlimit=50&format=json&origin=*";
+            try {
+                const response = await fetch(URL);
+                const data = await response.json();
+                
+                const rawTitles = data.query.random.map(page => page.title);
+                let validWords = [];
+
+                rawTitles.forEach(title => {
+                    // Split multi-word strings by spaces or underscores
+                    const words = title.split(/[\s_]+/);
+                    words.forEach(word => {
+                        // Strip out special characters, keeping pure alphabet strings
+                        const cleanWord = word.replace(/[^a-zA-Z]/g, "").toLowerCase();
+                        if (cleanWord.length >= 5 && cleanWord.length <= 8) {
+                            validWords.push(cleanWord);
+                        }
+                    });
+                });
+
+                console.log("🎯 Harvested Wiki Words Pool:", validWords);
+
+                if (validWords.length === 0) {
+                    console.warn("⚠️ No wiki words met length rules. Injecting fallback array.");
+                    return FALLBACK_WORDS;
+                }
+                return validWords;
+            } catch (error) {
+                console.error("❌ MediaWiki connection failed. Falling back gracefully.", error);
+                return FALLBACK_WORDS;
+            }
+        }
+
+        // 2. Deterministically select today's word based on a calendar date seed hash
+        function pickDailyWord(wordList) {
+            const today = new Date();
+            const dateSeed = (today.getFullYear() * 10000) + ((today.getMonth() + 1) * 100) + today.getDate();
+            
+            // Simple robust linear hash function to get identical results for all players today
+            let hash = 0;
+            const seedStr = dateSeed.toString();
+            for (let i = 0; i < seedStr.length; i++) {
+                hash = (hash << 5) - hash + seedStr.charCodeAt(i);
+                hash |= 0; 
+            }
+            
+            const selectedIndex = Math.abs(hash) % wordList.length;
+            const secretWord = wordList[selectedIndex];
+            
+            // Helpful debug helper for development testing
+            console.log(`🔒 Today's Calendar Seed: ${dateSeed} | Chosen Word: "${secretWord.toUpperCase()}"`);
+            return secretWord;
+        }
+
+        async function run() {
+            // Wait for both the WebAssembly compilation and the Wiki API network handshake
+            await init();
+            const wordPool = await fetchCampusWords();
+            const secretWord = pickDailyWord(wordPool);
+
+            // Pass the generated secret word into the updated Rust WASM Constructor
+            const game = new WordleGame(secretWord);
             const wordLength = game.get_word_length();
             let currentRow = 0;
 
             const input = document.getElementById('guessInput');
+            input.disabled = false;
             input.setAttribute('maxlength', wordLength);
             input.setAttribute('placeholder', `Type ${wordLength} letters...`);
+            input.focus();
 
             const grid = document.getElementById('grid');
             for (let i = 0; i < 6; i++) {
@@ -57,6 +127,7 @@
                     const guess = input.value.toLowerCase();
                     if (guess.length === wordLength) {
                         try {
+                            message.textContent = '';
                             const result = game.submit_guess(guess);
                             const rows = document.querySelectorAll('.row');
                             const tiles = rows[currentRow].children;
