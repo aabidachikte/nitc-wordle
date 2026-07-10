@@ -34,39 +34,43 @@
         ];
 
         // 1. Fetch random page titles from the MediaWiki API and isolate single words
-        async function fetchCampusWords() {
-            const URL = "https://wiki.fosscell.org/api.php?action=query&list=random&rnnamespace=0&rnlimit=50&format=json&origin=*";
-            try {
-                const response = await fetch(URL);
-                const data = await response.json();
-                
-                const rawTitles = data.query.random.map(page => page.title);
-                let validWords = [];
+async function fetchCampusWords() {
+    // We append the target URL to an allorigins proxy to bypass browser security headers completely
+    const targetURL = "https://wiki.fosscell.org/api.php?action=query&list=random&rnnamespace=0&rnlimit=50&format=json";
+    const proxyURL = `https://api.allorigins.win/get?url=${encodeURIComponent(targetURL)}`;
+    
+    try {
+        const response = await fetch(proxyURL);
+        const jsonWrapper = await response.json();
+        
+        // Allorigins returns the true response as a string inside jsonWrapper.contents
+        const data = JSON.parse(jsonWrapper.contents);
+        
+        const rawTitles = data.query.random.map(page => page.title);
+        let validWords = [];
 
-                rawTitles.forEach(title => {
-                    // Split multi-word strings by spaces or underscores
-                    const words = title.split(/[\s_]+/);
-                    words.forEach(word => {
-                        // Strip out special characters, keeping pure alphabet strings
-                        const cleanWord = word.replace(/[^a-zA-Z]/g, "").toLowerCase();
-                        if (cleanWord.length >= 5 && cleanWord.length <= 8) {
-                            validWords.push(cleanWord);
-                        }
-                    });
-                });
-
-                console.log("🎯 Harvested Wiki Words Pool:", validWords);
-
-                if (validWords.length === 0) {
-                    console.warn("⚠️ No wiki words met length rules. Injecting fallback array.");
-                    return FALLBACK_WORDS;
+        rawTitles.forEach(title => {
+            const words = title.split(/[\s_]+/);
+            words.forEach(word => {
+                const cleanWord = word.replace(/[^a-zA-Z]/g, "").toLowerCase();
+                if (cleanWord.length >= 5 && cleanWord.length <= 8) {
+                    validWords.push(cleanWord);
                 }
-                return validWords;
-            } catch (error) {
-                console.error("❌ MediaWiki connection failed. Falling back gracefully.", error);
-                return FALLBACK_WORDS;
-            }
+            });
+        });
+
+        console.log("🎯 Successfully bypassed CORS! Wiki Words:", validWords);
+
+        if (validWords.length === 0) {
+            console.warn("⚠️ No wiki words met length rules. Injecting fallback array.");
+            return FALLBACK_WORDS;
         }
+        return validWords;
+    } catch (error) {
+        console.error("❌ Both direct fetch and CORS proxy failed. Loading fallback list.", error);
+        return FALLBACK_WORDS;
+    }
+}
 
         // 2. Deterministically select today's word based on a calendar date seed hash
         function pickDailyWord(wordList) {
