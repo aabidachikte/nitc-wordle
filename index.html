@@ -34,28 +34,33 @@
         ];
 
         // 1. Fetch random page titles from the MediaWiki API and isolate single words
-function fetchCampusWords() {
-    return new Promise((resolve) => {
-        // Create a unique temporary callback function name
-        const callbackName = 'mediawiki_jsonp_' + Math.floor(Math.random() * 100000);
-        
-        // Target URL using native MediaWiki JSONP callback parameter
-        const URL = `https://wiki.fosscell.org/api.php?action=query&list=random&rnnamespace=0&rnlimit=50&format=json&callback=${callbackName}`;
-        
-        // Fall back automatically after 2 seconds if the server doesn't respond
-        const timeoutId = setTimeout(() => {
-            console.warn("⚠️ API timed out. Loading fallback list.");
-            delete window[callbackName];
-            resolve(FALLBACK_WORDS);
-        }, 2000);
+        //
+        // NOTE: This previously used a JSONP script-injection hack (callback=...).
+        // That only works if the wiki admin has explicitly enabled $wgAllowJsonp /
+        // $wgCrossSiteAJAXdomains, which most modern MediaWiki installs do NOT do
+        // by default (JSONP was deprecated for security reasons). That's why the
+        // callback never fired and every request silently died on the 2s timeout.
+        //
+        // The modern, officially supported way to call the MediaWiki API
+        // cross-origin is the `origin=*` query parameter: it tells MediaWiki to
+        // respond with real Access-Control-Allow-Origin CORS headers, so a plain
+        // fetch() works with no script-tag trickery.
+        // See: https://www.mediawiki.org/wiki/API:Cross-site_requests
+        async function fetchCampusWords() {
+            const URL = `https://wiki.fosscell.org/api.php?action=query&list=random&rnnamespace=0&rnlimit=50&format=json&origin=*`;
 
-        // Define the global handler that the Wiki will execute instantly
-        window[callbackName] = function(data) {
-            clearTimeout(timeoutId);
-            delete window[callbackName];
-            document.getElementById(callbackName)?.remove();
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 2000);
 
             try {
+                const response = await fetch(URL, { signal: controller.signal });
+                clearTimeout(timeoutId);
+
+                if (!response.ok) {
+                    throw new Error(`Wiki API responded with HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
                 const rawTitles = data.query.random.map(page => page.title);
                 let validWords = [];
 
@@ -72,49 +77,23 @@ function fetchCampusWords() {
 
                 console.log("🎯 Live Wiki Words Extracted:", validWords);
 
-                if (validWords.length === 0) {
-                    resolve(FALLBACK_WORDS);
-                } else {
-                    resolve(validWords);
-                }
+                return validWords.length === 0 ? FALLBACK_WORDS : validWords;
             } catch (err) {
-                console.error("Parser failed:", err);
-                resolve(FALLBACK_WORDS);
+                clearTimeout(timeoutId);
+                console.warn("⚠️ API request failed or timed out. Loading fallback list.", err);
+                return FALLBACK_WORDS;
             }
-        };
+        }
 
-        // Inject the script tag to initiate the handshake
-        const script = document.createElement('script');
-        script.id = callbackName;
-        script.src = URL;
-        script.onerror = () => {
-            clearTimeout(timeoutId);
-            delete window[callbackName];
-            script.remove();
-            resolve(FALLBACK_WORDS);
-        };
-        document.body.appendChild(script);
-    });
-}
-
-        // 2. Deterministically select today's word based on a calendar date seed hash
-        function pickDailyWord(wordList) {
-            const today = new Date();
-            const dateSeed = (today.getFullYear() * 10000) + ((today.getMonth() + 1) * 100) + today.getDate();
-            
-            // Simple robust linear hash function to get identical results for all players today
-            let hash = 0;
-            const seedStr = dateSeed.toString();
-            for (let i = 0; i < seedStr.length; i++) {
-                hash = (hash << 5) - hash + seedStr.charCodeAt(i);
-                hash |= 0; 
-            }
-            
-            const selectedIndex = Math.abs(hash) % wordList.length;
+        // 2. Pick a TRUE random word every single time this function is called —
+        // no date seed, no hashing, just Math.random(). This means every page
+        // refresh gets an independently random word instead of one shared
+        // "word of the day".
+        function pickRandomWord(wordList) {
+            const selectedIndex = Math.floor(Math.random() * wordList.length);
             const secretWord = wordList[selectedIndex];
-            
-            // Helpful debug helper for development testing
-            console.log(`🔒 Today's Calendar Seed: ${dateSeed} | Chosen Word: "${secretWord.toUpperCase()}"`);
+
+            console.log(`🎲 Randomly Chosen Word: "${secretWord.toUpperCase()}"`);
             return secretWord;
         }
 
@@ -122,7 +101,7 @@ function fetchCampusWords() {
             // Wait for both the WebAssembly compilation and the Wiki API network handshake
             await init();
             const wordPool = await fetchCampusWords();
-            const secretWord = pickDailyWord(wordPool);
+            const secretWord = pickRandomWord(wordPool);
 
             // Pass the generated secret word into the updated Rust WASM Constructor
             const game = new WordleGame(secretWord);
