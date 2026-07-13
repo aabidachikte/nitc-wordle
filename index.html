@@ -25,147 +25,145 @@
     <script type="module">
         import init, { WordleGame } from './pkg/nitc_wordle.js';
 
-        // 20 Hardcoded backup campus words as a safety net
+        // Strict 5-letter backup campus targets
         const FALLBACK_WORDS = [
-            "hostel", "campus", "library", "btech", "mtech", 
-            "ragam", "tathva", "canteen", "server", "degree",
-            "faculty", "alumni", "ncccat", "nlhc", "sambhram",
-            "chanakya", "aryabhatta", "mbahall", "lhgnd", "mega"
+            "ragam", "btech", "mtech", "admin", "links", 
+            "login", "hosts", "clubs", "award", "event",
+            "batch", "board", "coder", "excel", "alpha",
+            "dbmsx", "print", "nodes", "bytes", "smart"
         ];
 
-        // 1. Fetch random article content from the MediaWiki API and isolate single words
+        // 1. Fetch random article content from the MediaWiki API safely
         async function fetchCampusWords() {
-            // Bulletproof URL: Uses standard revisions prop which exists on ALL MediaWiki installations
-            const URL = `https://wiki.fosscell.org/api.php?action=query&generator=random&grnnamespace=0&grnlimit=10&prop=revisions&rvprop=content&rvslots=main&format=json&origin=*`;
+            const URL = `https://wiki.fosscell.org/api.php?action=query&generator=random&grnnamespace=0&grnlimit=15&prop=revisions&rvprop=content&format=json&origin=*`;
 
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 4000); // 4 seconds for raw text streams
+            const timeoutId = setTimeout(() => controller.abort(), 3000); 
 
             try {
                 const response = await fetch(URL, { signal: controller.signal });
                 clearTimeout(timeoutId);
 
                 if (!response.ok) {
-                    throw new Error(`Wiki API responded with HTTP ${response.status}`);
+                    throw new Error(`HTTP ${response.status}`);
                 }
 
                 const data = await response.json();
                 let validWords = [];
 
-                if (data.query && data.query.pages) {
-                    Object.values(data.query.pages).forEach(page => {
-                        let pageText = page.title;
+                if (data && data.query && data.query.pages) {
+                    for (const pageId in data.query.pages) {
+                        const page = data.query.pages[pageId];
+                        let pageText = page.title || "";
 
-                        // Extract raw text from standard MediaWiki revision slots
                         if (page.revisions && page.revisions[0]) {
-                            const slot = page.revisions[0].slots ? page.revisions[0].slots.main : page.revisions[0];
-                            if (slot && (slot["*"] || slot.content)) {
-                                pageText += " " + (slot["*"] || slot.content);
-                            }
+                            const rev = page.revisions[0];
+                            const content = rev["*"] || rev.content || "";
+                            pageText += " " + content;
                         }
-                        
-                        // Tokenize text into single words
+
                         const words = pageText.split(/[\s_]+/);
-                        words.forEach(word => {
-                            // Strip out wiki brackets, numbers, and punctuation
-                            const cleanWord = word.replace(/[^a-zA-Z]/g, "").toLowerCase();
-                            // Gate parameter constraints: 5 <= word length <= 8
-                            if (cleanWord.length >= 5 && cleanWord.length <= 8) {
+                        for (let i = 0; i < words.length; i++) {
+                            const cleanWord = words[i].replace(/[^a-zA-Z]/g, "").toLowerCase();
+                            // Strict structural change: Force exact match length of 5 
+                            if (cleanWord.length === 5) {
                                 validWords.push(cleanWord);
                             }
-                        });
-                    });
+                        }
+                    }
                 }
 
-                // Deduplicate values
                 validWords = [...new Set(validWords)];
-
-                console.log("🎯 Live Wiki Words Extracted:", validWords);
+                console.log("🎯 Live Wiki 5-Letter Words Extracted:", validWords);
 
                 return validWords.length === 0 ? FALLBACK_WORDS : validWords;
             } catch (err) {
                 clearTimeout(timeoutId);
-                console.warn("⚠️ API request failed or timed out. Loading fallback list.", err);
+                console.warn("⚠️ API parsing error. Using backup list.", err);
                 return FALLBACK_WORDS;
             }
         }
 
-        // 2. Pick a TRUE random word every single time this function is called
         function pickRandomWord(wordList) {
             const selectedIndex = Math.floor(Math.random() * wordList.length);
             const secretWord = wordList[selectedIndex];
-
-            console.log(`🎲 Randomly Chosen Word: "${secretWord.toUpperCase()}"`);
+            console.log(`🎲 Active Match Word: "${secretWord.toUpperCase()}"`);
             return secretWord;
         }
 
         async function run() {
-            // Wait for both the WebAssembly compilation and the Wiki API network handshake
-            await init();
-            const wordPool = await fetchCampusWords();
-            const secretWord = pickRandomWord(wordPool);
+            try {
+                await init();
+                const wordPool = await fetchCampusWords();
+                const secretWord = pickRandomWord(wordPool);
 
-            // Pass the generated secret word into the updated Rust WASM Constructor
-            const game = new WordleGame(secretWord);
-            const wordLength = game.get_word_length();
-            let currentRow = 0;
+                const game = new WordleGame(secretWord);
+                const wordLength = game.get_word_length();
+                let currentRow = 0;
 
-            const input = document.getElementById('guessInput');
-            input.disabled = false;
-            input.setAttribute('maxlength', wordLength);
-            input.setAttribute('placeholder', `Type ${wordLength} letters...`);
-            input.focus();
+                const input = document.getElementById('guessInput');
+                input.disabled = false;
+                input.setAttribute('maxlength', wordLength);
+                input.setAttribute('placeholder', `Type ${wordLength} letters...`);
+                input.focus();
 
-            const grid = document.getElementById('grid');
-            for (let i = 0; i < 6; i++) {
-                const row = document.createElement('div');
-                row.className = 'row';
-                row.style.gridTemplateColumns = `repeat(${wordLength}, 1fr)`;
-                
-                for (let j = 0; j < wordLength; j++) {
-                    const tile = document.createElement('div');
-                    tile.className = 'tile';
-                    row.appendChild(tile);
-                }
-                grid.appendChild(row);
-            }
-
-            const message = document.getElementById('message');
-
-            input.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {
-                    const guess = input.value.toLowerCase();
-                    if (guess.length === wordLength) {
-                        try {
-                            message.textContent = '';
-                            const result = game.submit_guess(guess);
-                            const rows = document.querySelectorAll('.row');
-                            const tiles = rows[currentRow].children;
-
-                            result.forEach((res, index) => {
-                                tiles[index].textContent = res.letter;
-                                tiles[index].classList.add(res.state);
-                            });
-
-                            input.value = '';
-                            
-                            if (game.is_won()) {
-                                message.textContent = "🎉 You Won!";
-                                input.disabled = true;
-                            } else if (game.is_game_over()) {
-                                message.textContent = `Game Over! The word was: ${game.get_secret_word().toUpperCase()}`;
-                                input.disabled = true;
-                            } else {
-                                currentRow++;
-                            }
-                        } catch (err) {
-                            message.textContent = err;
-                        }
-                    } else {
-                        message.textContent = `Word must be exactly ${wordLength} letters.`;
+                const grid = document.getElementById('grid');
+                grid.innerHTML = ''; 
+                for (let i = 0; i < 6; i++) {
+                    const row = document.createElement('div');
+                    row.className = 'row';
+                    row.style.gridTemplateColumns = `repeat(${wordLength}, 1fr)`;
+                    
+                    for (let j = 0; j < wordLength; j++) {
+                        const tile = document.createElement('div');
+                        tile.className = 'tile';
+                        row.appendChild(tile);
                     }
+                    grid.appendChild(row);
                 }
-            });
+
+                const message = document.getElementById('message');
+                input.replaceWith(input.cloneNode(true)); 
+                const newLiveInput = document.getElementById('guessInput');
+
+                newLiveInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        const guess = newLiveInput.value.toLowerCase();
+                        if (guess.length === wordLength) {
+                            try {
+                                message.textContent = '';
+                                const result = game.submit_guess(guess);
+                                const rows = document.querySelectorAll('.row');
+                                const tiles = rows[currentRow].children;
+
+                                result.forEach((res, index) => {
+                                    tiles[index].textContent = res.letter;
+                                    tiles[index].classList.add(res.state);
+                                });
+
+                                newLiveInput.value = '';
+                                
+                                if (game.is_won()) {
+                                    message.textContent = "🎉 You Won!";
+                                    newLiveInput.disabled = true;
+                                } else if (game.is_game_over()) {
+                                    message.textContent = `Game Over! The word was: ${game.get_secret_word().toUpperCase()}`;
+                                    newLiveInput.disabled = true;
+                                } else {
+                                    currentRow++;
+                                }
+                            } catch (err) {
+                                message.textContent = err;
+                            }
+                        } else {
+                            message.textContent = `Word must be exactly ${wordLength} letters.`;
+                        }
+                    }
+                });
+            } catch (initErr) {
+                document.getElementById('message').textContent = "Initialization failed.";
+                console.error(initErr);
+            }
         }
         run();
     </script>
