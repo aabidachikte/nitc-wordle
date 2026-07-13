@@ -1,2 +1,6 @@
 /target
 /nitc-wordle/target
+
+/target/
+/pkg/
+Cargo.lock
