@@ -33,24 +33,13 @@
             "chanakya", "aryabhatta", "mbahall", "lhgnd", "mega"
         ];
 
-        // 1. Fetch random page titles from the MediaWiki API and isolate single words
-        //
-        // NOTE: This previously used a JSONP script-injection hack (callback=...).
-        // That only works if the wiki admin has explicitly enabled $wgAllowJsonp /
-        // $wgCrossSiteAJAXdomains, which most modern MediaWiki installs do NOT do
-        // by default (JSONP was deprecated for security reasons). That's why the
-        // callback never fired and every request silently died on the 2s timeout.
-        //
-        // The modern, officially supported way to call the MediaWiki API
-        // cross-origin is the `origin=*` query parameter: it tells MediaWiki to
-        // respond with real Access-Control-Allow-Origin CORS headers, so a plain
-        // fetch() works with no script-tag trickery.
-        // See: https://www.mediawiki.org/wiki/API:Cross-site_requests
+        // 1. Fetch random article content from the MediaWiki API and isolate single words
         async function fetchCampusWords() {
-            const URL = `https://wiki.fosscell.org/api.php?action=query&list=random&rnnamespace=0&rnlimit=50&format=json&origin=*`;
+            // Pulls actual introductory plain text extracts from 20 random wiki pages at once
+            const URL = `https://wiki.fosscell.org/api.php?action=query&generator=random&grnnamespace=0&grnlimit=20&prop=extracts&exintro=1&explaintext=1&format=json&origin=*`;
 
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 2000);
+            const timeoutId = setTimeout(() => controller.abort(), 3000); // 3-second network fallback grace threshold
 
             try {
                 const response = await fetch(URL, { signal: controller.signal });
@@ -61,19 +50,28 @@
                 }
 
                 const data = await response.json();
-                const rawTitles = data.query.random.map(page => page.title);
                 let validWords = [];
 
-                rawTitles.forEach(title => {
-                    // Split strings by spaces or underscores
-                    const words = title.split(/[\s_]+/);
-                    words.forEach(word => {
-                        const cleanWord = word.replace(/[^a-zA-Z]/g, "").toLowerCase();
-                        if (cleanWord.length >= 5 && cleanWord.length <= 8) {
-                            validWords.push(cleanWord);
-                        }
+                // Extract and tokenize text body content if pages exist
+                if (data.query && data.query.pages) {
+                    Object.values(data.query.pages).forEach(page => {
+                        // Combine page titles with introductory context bodies to widen dictionary volume
+                        const fullText = `${page.title} ${page.extract || ""}`;
+                        
+                        // Split strings uniformly into single tokens
+                        const words = fullText.split(/[\s_]+/);
+                        words.forEach(word => {
+                            const cleanWord = word.replace(/[^a-zA-Z]/g, "").toLowerCase();
+                            // Gate parameters constraints: 5 <= word length <= 8
+                            if (cleanWord.length >= 5 && cleanWord.length <= 8) {
+                                validWords.push(cleanWord);
+                            }
+                        });
                     });
-                });
+                }
+
+                // Deduplicate values using a native Set structure array conversion
+                validWords = [...new Set(validWords)];
 
                 console.log("🎯 Live Wiki Words Extracted:", validWords);
 
@@ -85,10 +83,7 @@
             }
         }
 
-        // 2. Pick a TRUE random word every single time this function is called —
-        // no date seed, no hashing, just Math.random(). This means every page
-        // refresh gets an independently random word instead of one shared
-        // "word of the day".
+        // 2. Pick a TRUE random word every single time this function is called
         function pickRandomWord(wordList) {
             const selectedIndex = Math.floor(Math.random() * wordList.length);
             const secretWord = wordList[selectedIndex];
