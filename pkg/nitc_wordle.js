@@ -63,6 +63,28 @@ export class WordleGame {
         wasm.__wbg_wordlegame_free(ptr, 0);
     }
     /**
+     * @returns {string}
+     */
+    get_secret_word() {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const ret = wasm.wordlegame_get_secret_word(this.__wbg_ptr);
+            deferred1_0 = ret[0];
+            deferred1_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+        }
+    }
+    /**
+     * @returns {number}
+     */
+    get_word_length() {
+        const ret = wasm.wordlegame_get_word_length(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
      * @returns {boolean}
      */
     is_game_over() {

@@ -18,6 +18,8 @@ export enum LetterState {
 export class WordleGame {
     free(): void;
     [Symbol.dispose](): void;
+    get_secret_word(): string;
+    get_word_length(): number;
     is_game_over(): boolean;
     is_won(): boolean;
     constructor(secret_word: string);
@@ -34,6 +36,8 @@ export interface InitOutput {
     readonly __wbg_set_guessresult_letter: (a: number, b: number) => void;
     readonly __wbg_set_guessresult_state: (a: number, b: number) => void;
     readonly __wbg_wordlegame_free: (a: number, b: number) => void;
+    readonly wordlegame_get_secret_word: (a: number) => [number, number];
+    readonly wordlegame_get_word_length: (a: number) => number;
     readonly wordlegame_is_game_over: (a: number) => number;
     readonly wordlegame_is_won: (a: number) => number;
     readonly wordlegame_new: (a: number, b: number) => number;
@@ -43,6 +47,7 @@ export interface InitOutput {
     readonly __wbindgen_exn_store: (a: number) => void;
     readonly __externref_table_alloc: () => number;
     readonly __wbindgen_externrefs: WebAssembly.Table;
+    readonly __wbindgen_free: (a: number, b: number, c: number) => void;
     readonly __externref_table_dealloc: (a: number) => void;
     readonly __wbindgen_start: () => void;
 }

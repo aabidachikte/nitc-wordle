@@ -79,3 +79,14 @@ impl WordleGame {
         self.is_won() || self.guesses.len() >= self.max_guesses
     }
 }
+
+#[wasm_bindgen]
+impl WordleGame {
+    pub fn get_word_length(&self) -> usize {
+        self.secret_word.len()
+    }
+
+    pub fn get_secret_word(&self) -> String {
+        self.secret_word.clone()
+    }
+}
