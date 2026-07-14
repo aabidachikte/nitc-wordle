@@ -28,9 +28,11 @@
         // Single-word fallbacks
         const FALLBACK_WORDS = ["ragam", "btech", "mtech", "admin", "links", "hosts", "clubs", "event", "batch", "board"];
 
+        // Words to filter out completely
+        const BLACKLIST = ["image", "cargo", "thumb", "width", "align", "files", "photo"];
+
         // Pulls exactly 1 random page and extracts the first matching 5-letter word
         async function fetchSingleCampusWord() {
-            // grnlimit=1 ensures we query only a single random page
             const URL = `https://wiki.fosscell.org/api.php?action=query&generator=random&grnnamespace=0&grnlimit=1&prop=revisions&rvprop=content&format=json&origin=*`;
 
             const controller = new AbortController();
@@ -58,14 +60,16 @@
                         const words = pageText.split(/[\s_]+/);
                         for (let i = 0; i < words.length; i++) {
                             const cleanWord = words[i].replace(/[^a-zA-Z]/g, "").toLowerCase();
-                            if (cleanWord.length === 5) {
+                            
+                            // Check if word is 5 letters long AND is not blacklisted
+                            if (cleanWord.length === 5 && !BLACKLIST.includes(cleanWord)) {
                                 console.log(`🎯 Found matching word on page: "${cleanWord.toUpperCase()}"`);
                                 return cleanWord; 
                             }
                         }
                     }
                 }
-                throw new Error("No 5-letter words found on this page.");
+                throw new Error("No clean 5-letter words found on this page.");
             } catch (err) {
                 clearTimeout(timeoutId);
                 const fallback = FALLBACK_WORDS[Math.floor(Math.random() * FALLBACK_WORDS.length)];
@@ -77,7 +81,6 @@
         async function run() {
             try {
                 await init();
-                // Fetch just one word
                 const secretWord = await fetchSingleCampusWord();
                 console.log(`🎲 Active Match Word: "${secretWord.toUpperCase()}"`);
 
