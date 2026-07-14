@@ -16,7 +16,7 @@
         .controls-container { display: flex; flex-direction: column; align-items: center; gap: 12px; }
         input { padding: 10px; font-size: 16px; border-radius: 4px; border: none; outline: none; text-align: center; width: 200px; }
         
-        /* Blacklist Button Styling */
+        /* Admin Block Button Styling */
         #blacklistBtn {
             background-color: transparent;
             color: #ff4d4d;
@@ -41,7 +41,8 @@
     
     <div class="controls-container">
         <input type="text" id="guessInput" placeholder="Loading game data..." disabled autofocus>
-        <button id="blacklistBtn" style="display: none;">Block & Skip Word</button>
+        <!-- Button is strictly hidden by default -->
+        <button id="blacklistBtn" style="display: none;">Block & Skip Word (Admin Only)</button>
     </div>
     
     <p id="message"></p>
@@ -49,23 +50,32 @@
     <script type="module">
         import init, { WordleGame } from './pkg/nitc_wordle.js';
 
+        // Set your private admin password here
+        const ADMIN_PASSWORD = "opensesame"; 
+
         // Expanded fallback dictionary of 50 campus, engineering, and student life words
         const FALLBACK_WORDS = [
             "ragam", "btech", "mtech", "links", "hosts", "clubs", "event", "batch", "board", "smart",
-            "tathv", "messx", "grade", "exams", "class", "study", "paper", "score", "major", "minor",
-            "bytes", "codes", "nodes", "stack", "queue", "array", "graph", "trees", "logic", "input",
-            "react", "rusty", "learn", "teach", "coach", "draft", "group", "teams", "bench", "chair",
-            "chalk", "books", "tests", "rules", "gates", "omega", "alpha", "laser", "radar", "solar"
+            "grade", "exams", "class", "study", "paper", "score", "major", "minor",
+            "bytes", "codes", "stack", "queue", "array", "graph", "trees", "logic", "input",
+            "react", "learn", "teach", "coach", "draft", "group", "teams", "bench", "chair",
+            "chalk", "books", "tests", "rules", "gates"
         ];
 
-        // Filter out layout syntax, common pronouns, structural wiki nouns, and prepositions
+        // Global master blacklist. Update this when you copy-paste new blocked words.
         const STATIC_BLACKLIST = [
             "image", "cargo", "thumb", "width", "align", "files", "photo",
             "notes", "admin", "thats", "which", "there", "their", "about", 
             "would", "could", "write", "print", "under", "other", "order"
         ];
 
-        // Retrieve dynamic local-storage blacklist
+        // Check if the current visitor is the admin
+        function isAdmin() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('admin') === ADMIN_PASSWORD;
+        }
+
+        // Retrieve local admin blacklist
         function getDynamicBlacklist() {
             try {
                 return JSON.parse(localStorage.getItem('nitc_wordle_blacklist')) || [];
@@ -74,26 +84,35 @@
             }
         }
 
-        // Add a word to local storage blacklist and reload
+        // Add word to blocklist, show copy-paste code, and reload
         function blacklistWord(word) {
             const currentList = getDynamicBlacklist();
             if (word && !currentList.includes(word)) {
                 currentList.push(word);
                 localStorage.setItem('nitc_wordle_blacklist', JSON.stringify(currentList));
-                console.log(`🚫 Permanent Blocked: "${word.toUpperCase()}"`);
             }
-            window.location.reload(); // Instantly reload to fetch a new word
+
+            // Generate updated array to make it easy for you to copy-paste into STATIC_BLACKLIST
+            const mergedList = [...new Set([...STATIC_BLACKLIST, ...currentList])];
+            const formattedArray = JSON.stringify(mergedList);
+
+            alert(
+                `🚫 Word "${word.toUpperCase()}" Blocked locally!\n\n` +
+                `To make this global for EVERYONE, copy this array and paste it over STATIC_BLACKLIST in your index.html:\n\n` +
+                `${formattedArray}`
+            );
+
+            window.location.reload(); 
         }
 
         // Pulls exactly 5 random pages in 1 query, filters them, and picks 1 random word
         async function fetchSingleCampusWord() {
-            // grnlimit=5 fetches 5 pages in a single HTTP request to minimize wiki traffic
             const URL = `https://wiki.fosscell.org/api.php?action=query&generator=random&grnnamespace=0&grnlimit=5&prop=revisions&rvprop=content&format=json&origin=*`;
 
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 3000); 
 
-            // Merge code-level blacklist with user blacklist
+            // Combine code-level blocks with admin's dynamic local blocks
             const activeBlacklist = [...STATIC_BLACKLIST, ...getDynamicBlacklist()];
 
             try {
@@ -152,7 +171,7 @@
                             continue; 
                         }
 
-                        // 5. Gather all eligible words from this page
+                        // 5. Gather all eligible words
                         const words = pageText.split(/[\s_]+/);
                         for (let i = 0; i < words.length; i++) {
                             const cleanWord = words[i].replace(/[^a-zA-Z]/g, "").toLowerCase();
@@ -164,7 +183,6 @@
                     }
                 }
 
-                // 6. Pick a random word from the combined multi-page pool
                 if (masterWordPool.length > 0) {
                     const randomIndex = Math.floor(Math.random() * masterWordPool.length);
                     const selectedWord = masterWordPool[randomIndex];
@@ -199,9 +217,11 @@
                 input.setAttribute('placeholder', `Type ${wordLength} letters...`);
                 input.focus();
 
-                // Show the block button once a word is loaded
-                blacklistBtn.style.display = "block";
-                blacklistBtn.onclick = () => blacklistWord(secretWord);
+                // Only reveal the Block button if visiting with ?admin=opensesame URL parameter
+                if (isAdmin()) {
+                    blacklistBtn.style.display = "block";
+                    blacklistBtn.onclick = () => blacklistWord(secretWord);
+                }
 
                 const grid = document.getElementById('grid');
                 grid.innerHTML = ''; 
