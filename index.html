@@ -26,10 +26,14 @@
         import init, { WordleGame } from './pkg/nitc_wordle.js';
 
         // Single-word fallbacks
-        const FALLBACK_WORDS = ["ragam", "btech", "mtech", "admin", "links", "hosts", "clubs", "event", "batch", "board"];
+        const FALLBACK_WORDS = ["ragam", "btech", "mtech", "links", "hosts", "clubs", "event", "batch", "board", "smart"];
 
-        // Words to filter out completely
-        const BLACKLIST = ["image", "cargo", "thumb", "width", "align", "files", "photo"];
+        // Expanded blacklist to filter out metadata, common pronouns, and non-topic words
+        const BLACKLIST = [
+            "image", "cargo", "thumb", "width", "align", "files", "photo",
+            "notes", "admin", "thats", "which", "there", "their", "about", 
+            "would", "could", "write", "print", "under", "other"
+        ];
 
         // Pulls exactly 1 random page and extracts the first matching 5-letter word
         async function fetchSingleCampusWord() {
