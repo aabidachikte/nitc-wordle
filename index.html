@@ -53,14 +53,35 @@
                 if (data && data.query && data.query.pages) {
                     for (const pageId in data.query.pages) {
                         const page = data.query.pages[pageId];
-                        let pageText = (page.title || "") + " ";
+                        const title = (page.title || "").trim();
+                        const lowercaseTitle = title.toLowerCase();
+
+                        // 1. STAGE 1 BLOCKS: Reject if it's outside the Main Namespace (ns: 0)
+                        if (page.ns !== 0) {
+                            throw new Error(`Skipped non-main namespace page: ${title}`);
+                        }
+
+                        // 2. STAGE 2 BLOCKS: Reject explicit userpages, categories, templates, or subpages
+                        if (
+                            lowercaseTitle.startsWith("user:") || 
+                            lowercaseTitle.startsWith("user talk:") ||
+                            lowercaseTitle.startsWith("category:") ||
+                            lowercaseTitle.startsWith("template:") ||
+                            lowercaseTitle.includes("user") ||       // Catch-all for "user" profiles
+                            lowercaseTitle.includes("member") ||     // Discard member roster pages
+                            title.includes("/")                      // Discard subpages entirely
+                        ) {
+                            throw new Error(`Skipped user/profile page: ${title}`);
+                        }
+
+                        let pageText = title + " ";
 
                         if (page.revisions && page.revisions[0]) {
                             const rev = page.revisions[0];
                             pageText += rev["*"] || rev.content || "";
                         }
 
-                        // 1. Find ALL valid, non-blacklisted 5-letter words on the page
+                        // 3. Find ALL valid, non-blacklisted 5-letter words on the page
                         const pageWords = [];
                         const words = pageText.split(/[\s_]+/);
                         
@@ -72,10 +93,11 @@
                             }
                         }
 
-                        // 2. Pick a RANDOM word from the gathered pool to avoid top-of-page bias
+                        // 4. Pick a RANDOM word from the gathered pool to avoid top-of-page bias
                         if (pageWords.length > 0) {
                             const randomIndex = Math.floor(Math.random() * pageWords.length);
                             const selectedWord = pageWords[randomIndex];
+                            console.log(`🎯 Validated page: "${title}"`);
                             console.log(`🎯 Randomly selected from ${pageWords.length} page words: "${selectedWord.toUpperCase()}"`);
                             return selectedWord;
                         }
@@ -85,7 +107,7 @@
             } catch (err) {
                 clearTimeout(timeoutId);
                 const fallback = FALLBACK_WORDS[Math.floor(Math.random() * FALLBACK_WORDS.length)];
-                console.warn("⚠️ Single fetch fallback used:", fallback, `(${err.message})`);
+                console.warn("⚠️ Userpage filter active or fetch failed. Fallback used:", fallback, `(${err.message})`);
                 return fallback;
             }
         }
