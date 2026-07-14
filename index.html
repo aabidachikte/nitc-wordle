@@ -12,14 +12,38 @@
         .Correct { background-color: #538d4e; border-color: #538d4e; }
         .Present { background-color: #b59f3b; border-color: #b59f3b; }
         .Absent { background-color: #3a3a3c; border-color: #3a3a3c; }
+        
+        .controls-container { display: flex; flex-direction: column; align-items: center; gap: 12px; }
         input { padding: 10px; font-size: 16px; border-radius: 4px; border: none; outline: none; text-align: center; width: 200px; }
+        
+        /* Blacklist Button Styling */
+        #blacklistBtn {
+            background-color: transparent;
+            color: #ff4d4d;
+            border: 1px solid #ff4d4d;
+            padding: 6px 12px;
+            font-size: 12px;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        #blacklistBtn:hover {
+            background-color: #ff4d4d;
+            color: white;
+        }
     </style>
 </head>
 <body>
 
     <h1>NITC Wordle</h1>
     <div id="grid"></div>
-    <input type="text" id="guessInput" placeholder="Loading game data..." disabled autofocus>
+    
+    <div class="controls-container">
+        <input type="text" id="guessInput" placeholder="Loading game data..." disabled autofocus>
+        <button id="blacklistBtn" style="display: none;">Block & Skip Word</button>
+    </div>
+    
     <p id="message"></p>
 
     <script type="module">
@@ -27,25 +51,50 @@
 
         // Expanded fallback dictionary of 50 campus, engineering, and student life words
         const FALLBACK_WORDS = [
-            "ragam", "btech", "mtech", "links", "hosts", "clubs", "event", "batch", "board", "smart", "grade", "exams", "class", "study", "paper", "score", "major", "minor",
-            "bytes", "codes", "stack", "queue", "array", "graph", "trees", "logic", "input",
-            "react",  "learn", "teach", "coach", "draft", "group", "teams", "bench", "chair",
-            "chalk", "books", "tests", "rules", "gates"
+            "ragam", "btech", "mtech", "links", "hosts", "clubs", "event", "batch", "board", "smart",
+            "tathv", "messx", "grade", "exams", "class", "study", "paper", "score", "major", "minor",
+            "bytes", "codes", "nodes", "stack", "queue", "array", "graph", "trees", "logic", "input",
+            "react", "rusty", "learn", "teach", "coach", "draft", "group", "teams", "bench", "chair",
+            "chalk", "books", "tests", "rules", "gates", "omega", "alpha", "laser", "radar", "solar"
         ];
 
         // Filter out layout syntax, common pronouns, structural wiki nouns, and prepositions
-        const BLACKLIST = [
+        const STATIC_BLACKLIST = [
             "image", "cargo", "thumb", "width", "align", "files", "photo",
             "notes", "admin", "thats", "which", "there", "their", "about", 
-            "would","named", "could", "write", "print", "under", "other", "these", "order"
+            "would", "could", "write", "print", "under", "other", "order"
         ];
 
-        // Pulls exactly 1 random page and extracts a random 5-letter word from its pool
+        // Retrieve dynamic local-storage blacklist
+        function getDynamicBlacklist() {
+            try {
+                return JSON.parse(localStorage.getItem('nitc_wordle_blacklist')) || [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        // Add a word to local storage blacklist and reload
+        function blacklistWord(word) {
+            const currentList = getDynamicBlacklist();
+            if (word && !currentList.includes(word)) {
+                currentList.push(word);
+                localStorage.setItem('nitc_wordle_blacklist', JSON.stringify(currentList));
+                console.log(`🚫 Permanent Blocked: "${word.toUpperCase()}"`);
+            }
+            window.location.reload(); // Instantly reload to fetch a new word
+        }
+
+        // Pulls exactly 5 random pages in 1 query, filters them, and picks 1 random word
         async function fetchSingleCampusWord() {
-            const URL = `https://wiki.fosscell.org/api.php?action=query&generator=random&grnnamespace=0&grnlimit=1&prop=revisions&rvprop=content&format=json&origin=*`;
+            // grnlimit=5 fetches 5 pages in a single HTTP request to minimize wiki traffic
+            const URL = `https://wiki.fosscell.org/api.php?action=query&generator=random&grnnamespace=0&grnlimit=5&prop=revisions&rvprop=content&format=json&origin=*`;
 
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 2500); 
+            const timeoutId = setTimeout(() => controller.abort(), 3000); 
+
+            // Merge code-level blacklist with user blacklist
+            const activeBlacklist = [...STATIC_BLACKLIST, ...getDynamicBlacklist()];
 
             try {
                 const response = await fetch(URL, { signal: controller.signal });
@@ -54,6 +103,7 @@
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
                 const data = await response.json();
+                const masterWordPool = [];
 
                 if (data && data.query && data.query.pages) {
                     for (const pageId in data.query.pages) {
@@ -61,12 +111,10 @@
                         const title = (page.title || "").trim();
                         const lowercaseTitle = title.toLowerCase();
 
-                        // 1. STAGE 1 BLOCKS: Reject if it's outside the Main Namespace (ns: 0)
-                        if (page.ns !== 0) {
-                            throw new Error(`Skipped non-main namespace page: ${title}`);
-                        }
+                        // 1. Namespace guard
+                        if (page.ns !== 0) continue;
 
-                        // 2. STAGE 2 BLOCKS: Reject explicit userpages, categories, templates, or subpages
+                        // 2. Structural/Explicit block rule
                         if (
                             lowercaseTitle.startsWith("user:") || 
                             lowercaseTitle.startsWith("user talk:") ||
@@ -76,14 +124,12 @@
                             lowercaseTitle.includes("member") ||     
                             title.includes("/")                      
                         ) {
-                            throw new Error(`Skipped user/profile page: ${title}`);
+                            continue;
                         }
 
-                        // 3. STAGE 3 BLOCKS: Check for Name-like patterns in the title
+                        // 3. Multi-word title guard
                         const titleWords = title.split(/\s+/);
-                        if (titleWords.length >= 3) {
-                            throw new Error(`Skipped page with multi-word name-like title: ${title}`);
-                        }
+                        if (titleWords.length >= 3) continue;
 
                         let pageText = title + " ";
                         let rawContent = "";
@@ -94,7 +140,7 @@
                             pageText += rawContent;
                         }
 
-                        // 4. STAGE 4 BLOCKS: Scan the page source content for member categories or biography templates
+                        // 4. Bio Metadata guard
                         const lowercaseContent = rawContent.toLowerCase();
                         if (
                             lowercaseContent.includes("category:members") ||
@@ -103,36 +149,34 @@
                             lowercaseContent.includes("{{member") ||
                             lowercaseContent.includes("{{profile")
                         ) {
-                            throw new Error(`Skipped main-namespace member profile: ${title}`);
+                            continue; 
                         }
 
-                        // 5. Find ALL valid, non-blacklisted 5-letter words on the page
-                        const pageWords = [];
+                        // 5. Gather all eligible words from this page
                         const words = pageText.split(/[\s_]+/);
-                        
                         for (let i = 0; i < words.length; i++) {
                             const cleanWord = words[i].replace(/[^a-zA-Z]/g, "").toLowerCase();
                             
-                            if (cleanWord.length === 5 && !BLACKLIST.includes(cleanWord)) {
-                                pageWords.push(cleanWord);
+                            if (cleanWord.length === 5 && !activeBlacklist.includes(cleanWord)) {
+                                masterWordPool.push(cleanWord);
                             }
-                        }
-
-                        // 6. Pick a RANDOM word from the gathered pool to avoid top-of-page bias
-                        if (pageWords.length > 0) {
-                            const randomIndex = Math.floor(Math.random() * pageWords.length);
-                            const selectedWord = pageWords[randomIndex];
-                            console.log(`🎯 Validated page: "${title}"`);
-                            console.log(`🎯 Randomly selected from ${pageWords.length} page words: "${selectedWord.toUpperCase()}"`);
-                            return selectedWord;
                         }
                     }
                 }
-                throw new Error("No clean 5-letter words found on this page.");
+
+                // 6. Pick a random word from the combined multi-page pool
+                if (masterWordPool.length > 0) {
+                    const randomIndex = Math.floor(Math.random() * masterWordPool.length);
+                    const selectedWord = masterWordPool[randomIndex];
+                    console.log(`🎯 Successfully pooled words across random pages.`);
+                    return selectedWord;
+                }
+
+                throw new Error("No clean 5-letter words found on any of the queried pages.");
             } catch (err) {
                 clearTimeout(timeoutId);
                 const fallback = FALLBACK_WORDS[Math.floor(Math.random() * FALLBACK_WORDS.length)];
-                console.warn("⚠️ Profile filter active or fetch failed. Fallback used:", fallback, `(${err.message})`);
+                console.warn("⚠️ Filter active or fetch failed. Fallback used:", fallback, `(${err.message})`);
                 return fallback;
             }
         }
@@ -148,10 +192,16 @@
                 let currentRow = 0;
 
                 const input = document.getElementById('guessInput');
+                const blacklistBtn = document.getElementById('blacklistBtn');
+
                 input.disabled = false;
                 input.setAttribute('maxlength', wordLength);
                 input.setAttribute('placeholder', `Type ${wordLength} letters...`);
                 input.focus();
+
+                // Show the block button once a word is loaded
+                blacklistBtn.style.display = "block";
+                blacklistBtn.onclick = () => blacklistWord(secretWord);
 
                 const grid = document.getElementById('grid');
                 grid.innerHTML = ''; 
@@ -192,9 +242,11 @@
                                 if (game.is_won()) {
                                     message.textContent = "🎉 You Won!";
                                     newLiveInput.disabled = true;
+                                    blacklistBtn.style.display = "none";
                                 } else if (game.is_game_over()) {
                                     message.textContent = `Game Over! The word was: ${game.get_secret_word().toUpperCase()}`;
                                     newLiveInput.disabled = true;
+                                    blacklistBtn.style.display = "none";
                                 } else {
                                     currentRow++;
                                 }
