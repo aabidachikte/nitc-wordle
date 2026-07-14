@@ -5,16 +5,59 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NITC Wordle Test</title>
     <style>
-        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: #121213; color: white; }
+        body { 
+            font-family: sans-serif; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            height: 100vh; 
+            margin: 0; 
+            background-color: #121213; 
+            color: white; 
+        }
+        
+        /* Header bar layout */
+        .header-bar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #3a3a3c;
+            padding-bottom: 10px;
+        }
+        h1 { margin: 0; font-size: 28px; }
+        
+        /* Help Button Styling */
+        #helpBtn {
+            position: absolute;
+            right: 10px;
+            background: none;
+            border: none;
+            color: #818384;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            outline: none;
+        }
+        #helpBtn:hover { color: white; }
+
         #grid { display: grid; grid-template-rows: repeat(6, 1fr); gap: 5px; margin-bottom: 20px; }
         .row { display: grid; gap: 5px; }
-        .tile { width: 50px; height: 50px; border: 2px solid #3a3a3c; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: bold; text-transform: uppercase; }
+        .tile { width: 50px; height: 50px; border: 2px solid #3a3a3c; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: bold; text-transform: uppercase; box-sizing: border-box; }
+        
         .Correct { background-color: #538d4e; border-color: #538d4e; }
         .Present { background-color: #b59f3b; border-color: #b59f3b; }
         .Absent { background-color: #3a3a3c; border-color: #3a3a3c; }
         
         .controls-container { display: flex; flex-direction: column; align-items: center; gap: 12px; }
-        input { padding: 10px; font-size: 16px; border-radius: 4px; border: none; outline: none; text-align: center; width: 200px; }
+        input { padding: 10px; font-size: 16px; border-radius: 4px; border: none; outline: none; text-align: center; width: 200px; background-color: #1a1a1b; color: white; border: 1px solid #3a3a3c; }
         
         /* Admin Block Button Styling */
         #blacklistBtn {
@@ -32,64 +75,114 @@
             background-color: #ff4d4d;
             color: white;
         }
+
+        /* Modal Overlay Style (Hidden by default) */
+        .modal {
+            display: none; 
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(18, 18, 19, 0.95);
+            justify-content: center;
+            align-items: center;
+        }
+        
+        /* Modal Interior Box */
+        .modal-content {
+            background-color: #1a1a1b;
+            color: white;
+            padding: 30px;
+            width: 90%;
+            max-width: 420px;
+            border-radius: 8px;
+            border: 1px solid #3a3a3c;
+            position: relative;
+            box-sizing: border-box;
+            box-shadow: 0 4px 23px rgba(0,0,0,0.5);
+        }
+        
+        .close-btn {
+            position: absolute;
+            right: 20px;
+            top: 15px;
+            font-size: 28px;
+            font-weight: bold;
+            color: #818384;
+            cursor: pointer;
+        }
+        .close-btn:hover { color: white; }
+        
+        .modal-content h2 { font-size: 24px; margin-top: 0; margin-bottom: 5px; }
+        .modal-content h3 { font-size: 16px; font-weight: normal; margin-top: 0; margin-bottom: 20px; color: #d7dadc; }
+        .modal-content ul { padding-left: 20px; font-size: 14px; line-height: 1.6; color: #d7dadc; }
+        .modal-content li { margin-bottom: 8px; }
+        
+        .examples-section { border-top: 1px solid #3a3a3c; margin-top: 20px; padding-top: 15px; }
+        .example-title { font-size: 14px; font-weight: bold; margin-bottom: 15px; }
+        .example-row { display: flex; gap: 5px; margin-bottom: 5px; }
+        .example-row .tile { width: 40px; height: 40px; font-size: 20px; }
+        .example-desc { font-size: 13px; color: #818384; margin-top: 5px; margin-bottom: 20px; }
     </style>
 </head>
 <body>
-<!-- How to Play Modal -->
-<div id="help-modal" class="modal">
-    <div class="modal-content">
-        <span class="close-btn" onclick="closeHelpModal()">&times;</span>
-        
-        <h2>How To Play</h2>
-        <h3>Guess the Wordle in 6 tries.</h3>
-        
-        <ul>
-            <li>Each guess must be a valid word (5 to 8 letters).</li>
-            <li>The color of the tiles will change to show how close your guess was to the word.</li>
-        </ul>
 
-        <div class="examples-section">
-            <p class="example-title"><strong>Examples</strong></p>
+    <!-- Header bar featuring title and help icon trigger -->
+    <div class="header-bar">
+        <h1>NITC Wordle</h1>
+        <button id="helpBtn">❓</button>
+    </div>
+
+    <!-- How to Play Modal Popup Overlay -->
+    <div id="help-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" id="closeHelpBtn">&times;</span>
+            <h2>How To Play</h2>
+            <h3>Guess the Wordle in 6 tries.</h3>
+            <ul>
+                <li>Each guess must be a valid word.</li>
+                <li>The color of the tiles will change to show how close your guess was to the word.</li>
+            </ul>
             
-            <!-- Example 1: Green -->
-            <div class="example-row">
-                <div class="tile correct">W</div>
-                <div class="tile">O</div>
-                <div class="tile">R</div>
-                <div class="tile">D</div>
-                <div class="tile">Y</div>
-            </div>
-            <p class="example-desc"><strong>W</strong> is in the word and in the correct spot.</p>
+            <div class="examples-section">
+                <div class="example-title">Examples</div>
+                
+                <div class="example-row">
+                    <div class="tile Correct">W</div>
+                    <div class="tile">O</div>
+                    <div class="tile">R</div>
+                    <div class="tile">D</div>
+                    <div class="tile">Y</div>
+                </div>
+                <div class="example-desc"><strong>W</strong> is in the word and in the correct spot.</div>
 
-            <!-- Example 2: Yellow -->
-            <div class="example-row">
-                <div class="tile">L</div>
-                <div class="tile present">I</div>
-                <div class="tile">G</div>
-                <div class="tile">H</div>
-                <div class="tile">T</div>
-            </div>
-            <p class="example-desc"><strong>I</strong> is in the word but in the wrong spot.</p>
+                <div class="example-row">
+                    <div class="tile">L</div>
+                    <div class="tile Present">I</div>
+                    <div class="tile">G</div>
+                    <div class="tile">H</div>
+                    <div class="tile">T</div>
+                </div>
+                <div class="example-desc"><strong>I</strong> is in the word but in the wrong spot.</div>
 
-            <!-- Example 3: Grey -->
-            <div class="example-row">
-                <div class="tile">R</div>
-                <div class="tile">O</div>
-                <div class="tile">G</div>
-                <div class="tile absent">U</div>
-                <div class="tile">E</div>
+                <div class="example-row">
+                    <div class="tile">R</div>
+                    <div class="tile">O</div>
+                    <div class="tile">G</div>
+                    <div class="tile Absent">U</div>
+                    <div class="tile">E</div>
+                </div>
+                <div class="example-desc"><strong>U</strong> is not in the word in any spot.</div>
             </div>
-            <p class="example-desc"><strong>U</strong> is not in the word in any spot.</p>
         </div>
     </div>
-</div>
-    
-    <h1>NITC Wordle</h1>
+
     <div id="grid"></div>
     
     <div class="controls-container">
         <input type="text" id="guessInput" placeholder="Loading game data..." disabled autofocus>
-        <!-- Button is strictly hidden by default -->
         <button id="blacklistBtn" style="display: none;">Block & Skip Word (Admin Only)</button>
     </div>
     
@@ -98,10 +191,8 @@
     <script type="module">
         import init, { WordleGame } from './pkg/nitc_wordle.js';
 
-        // Set your private admin password here
         const ADMIN_PASSWORD = "opensesame"; 
 
-        // Expanded fallback dictionary of 50 campus, engineering, and student life words
         const FALLBACK_WORDS = [
             "ragam", "btech", "mtech", "links", "hosts", "clubs", "event", "batch", "board", "smart",
             "grade", "exams", "class", "study", "paper", "score", "major", "minor",
@@ -110,20 +201,23 @@
             "chalk", "books", "tests", "rules", "gates"
         ];
 
-        // Global master blacklist. Update this when you copy-paste new blocked words.
         const STATIC_BLACKLIST = [
             "image", "cargo", "thumb", "width", "align", "files", "photo",
             "notes", "admin", "thats", "which", "there", "their", "about", 
             "would", "could", "write", "print", "under", "other", "order","three", "block", "einis","since", "peyis", "named", "rajan", "srija", "dayis", "libya", "danis", "added", "penis"
         ];
 
-        // Check if the current visitor is the admin
+        // Modal triggers binding
+        const helpModal = document.getElementById("help-modal");
+        document.getElementById("helpBtn").onclick = () => helpModal.style.display = "flex";
+        document.getElementById("closeHelpBtn").onclick = () => helpModal.style.display = "none";
+        window.onclick = (e) => { if (e.target === helpModal) helpModal.style.display = "none"; };
+
         function isAdmin() {
             const urlParams = new URLSearchParams(window.location.search);
             return urlParams.get('admin') === ADMIN_PASSWORD;
         }
 
-        // Retrieve local admin blacklist
         function getDynamicBlacklist() {
             try {
                 return JSON.parse(localStorage.getItem('nitc_wordle_blacklist')) || [];
@@ -132,7 +226,6 @@
             }
         }
 
-        // Add word to blocklist, show copy-paste code, and reload
         function blacklistWord(word) {
             const currentList = getDynamicBlacklist();
             if (word && !currentList.includes(word)) {
@@ -140,7 +233,6 @@
                 localStorage.setItem('nitc_wordle_blacklist', JSON.stringify(currentList));
             }
 
-            // Generate updated array to make it easy for you to copy-paste into STATIC_BLACKLIST
             const mergedList = [...new Set([...STATIC_BLACKLIST, ...currentList])];
             const formattedArray = JSON.stringify(mergedList);
 
@@ -153,14 +245,12 @@
             window.location.reload(); 
         }
 
-        // Pulls exactly 5 random pages in 1 query, filters them, and picks 1 random word
         async function fetchSingleCampusWord() {
             const URL = `https://wiki.fosscell.org/api.php?action=query&generator=random&grnnamespace=0&grnlimit=5&prop=revisions&rvprop=content&format=json&origin=*`;
 
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 3000); 
 
-            // Combine code-level blocks with admin's dynamic local blocks
             const activeBlacklist = [...STATIC_BLACKLIST, ...getDynamicBlacklist()];
 
             try {
@@ -178,10 +268,8 @@
                         const title = (page.title || "").trim();
                         const lowercaseTitle = title.toLowerCase();
 
-                        // 1. Namespace guard
                         if (page.ns !== 0) continue;
 
-                        // 2. Structural/Explicit block rule
                         if (
                             lowercaseTitle.startsWith("user:") || 
                             lowercaseTitle.startsWith("user talk:") ||
@@ -194,7 +282,6 @@
                             continue;
                         }
 
-                        // 3. Multi-word title guard
                         const titleWords = title.split(/\s+/);
                         if (titleWords.length >= 3) continue;
 
@@ -207,7 +294,6 @@
                             pageText += rawContent;
                         }
 
-                        // 4. Bio Metadata guard
                         const lowercaseContent = rawContent.toLowerCase();
                         if (
                             lowercaseContent.includes("category:members") ||
@@ -219,7 +305,6 @@
                             continue; 
                         }
 
-                        // 5. Gather all eligible words
                         const words = pageText.split(/[\s_]+/);
                         for (let i = 0; i < words.length; i++) {
                             const cleanWord = words[i].replace(/[^a-zA-Z]/g, "").toLowerCase();
@@ -265,7 +350,6 @@
                 input.setAttribute('placeholder', `Type ${wordLength} letters...`);
                 input.focus();
 
-                // Only reveal the Block button if visiting with ?admin=opensesame URL parameter
                 if (isAdmin()) {
                     blacklistBtn.style.display = "block";
                     blacklistBtn.onclick = () => blacklistWord(secretWord);
