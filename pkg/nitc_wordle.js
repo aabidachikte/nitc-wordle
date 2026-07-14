@@ -1,46 +1,46 @@
 /* @ts-self-types="./nitc_wordle.d.ts" */
 
-export class GuessResult {
+export class GradedLetter {
+    static __wrap(ptr) {
+        const obj = Object.create(GradedLetter.prototype);
+        obj.__wbg_ptr = ptr;
+        GradedLetterFinalization.register(obj, obj.__wbg_ptr, obj);
+        return obj;
+    }
     __destroy_into_raw() {
         const ptr = this.__wbg_ptr;
         this.__wbg_ptr = 0;
-        GuessResultFinalization.unregister(this);
+        GradedLetterFinalization.unregister(this);
         return ptr;
     }
     free() {
         const ptr = this.__destroy_into_raw();
-        wasm.__wbg_guessresult_free(ptr, 0);
+        wasm.__wbg_gradedletter_free(ptr, 0);
     }
     /**
      * @returns {string}
      */
     get letter() {
-        const ret = wasm.__wbg_get_guessresult_letter(this.__wbg_ptr);
+        const ret = wasm.gradedletter_letter(this.__wbg_ptr);
         return String.fromCodePoint(ret);
     }
     /**
-     * @returns {LetterState}
+     * @returns {string}
      */
     get state() {
-        const ret = wasm.__wbg_get_guessresult_state(this.__wbg_ptr);
-        return ret;
-    }
-    /**
-     * @param {string} arg0
-     */
-    set letter(arg0) {
-        const char0 = arg0.codePointAt(0);
-        _assertChar(char0);
-        wasm.__wbg_set_guessresult_letter(this.__wbg_ptr, char0);
-    }
-    /**
-     * @param {LetterState} arg0
-     */
-    set state(arg0) {
-        wasm.__wbg_set_guessresult_state(this.__wbg_ptr, arg0);
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const ret = wasm.gradedletter_state(this.__wbg_ptr);
+            deferred1_0 = ret[0];
+            deferred1_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+        }
     }
 }
-if (Symbol.dispose) GuessResult.prototype[Symbol.dispose] = GuessResult.prototype.free;
+if (Symbol.dispose) GradedLetter.prototype[Symbol.dispose] = GradedLetter.prototype.free;
 
 /**
  * @enum {0 | 1 | 2}
@@ -111,49 +111,30 @@ export class WordleGame {
     }
     /**
      * @param {string} guess
-     * @returns {any}
+     * @returns {GradedLetter[]}
      */
     submit_guess(guess) {
         const ptr0 = passStringToWasm0(guess, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len0 = WASM_VECTOR_LEN;
         const ret = wasm.wordlegame_submit_guess(this.__wbg_ptr, ptr0, len0);
-        if (ret[2]) {
-            throw takeFromExternrefTable0(ret[1]);
+        if (ret[3]) {
+            throw takeFromExternrefTable0(ret[2]);
         }
-        return takeFromExternrefTable0(ret[0]);
+        var v2 = getArrayJsValueFromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
+        return v2;
     }
 }
 if (Symbol.dispose) WordleGame.prototype[Symbol.dispose] = WordleGame.prototype.free;
 function __wbg_get_imports() {
     const import0 = {
         __proto__: null,
-        __wbg_String_8564e559799eccda: function(arg0, arg1) {
-            const ret = String(arg1);
-            const ptr1 = passStringToWasm0(ret, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-            const len1 = WASM_VECTOR_LEN;
-            getDataViewMemory0().setInt32(arg0 + 4 * 1, len1, true);
-            getDataViewMemory0().setInt32(arg0 + 4 * 0, ptr1, true);
-        },
         __wbg___wbindgen_throw_344f42d3211c4765: function(arg0, arg1) {
             throw new Error(getStringFromWasm0(arg0, arg1));
         },
-        __wbg_fromCodePoint_a952b701bbb83fa4: function() { return handleError(function (arg0) {
-            const ret = String.fromCodePoint(arg0 >>> 0);
+        __wbg_gradedletter_new: function(arg0) {
+            const ret = GradedLetter.__wrap(arg0);
             return ret;
-        }, arguments); },
-        __wbg_new_32b398fb48b6d94a: function() {
-            const ret = new Array();
-            return ret;
-        },
-        __wbg_new_da52cf8fe3429cb2: function() {
-            const ret = new Object();
-            return ret;
-        },
-        __wbg_set_6be42768c690e380: function(arg0, arg1, arg2) {
-            arg0[arg1] = arg2;
-        },
-        __wbg_set_8a16b38e4805b298: function(arg0, arg1, arg2) {
-            arg0[arg1 >>> 0] = arg2;
         },
         __wbindgen_cast_0000000000000001: function(arg0, arg1) {
             // Cast intrinsic for `Ref(String) -> Externref`.
@@ -176,21 +157,22 @@ function __wbg_get_imports() {
     };
 }
 
-const GuessResultFinalization = (typeof FinalizationRegistry === 'undefined')
+const GradedLetterFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
-    : new FinalizationRegistry(ptr => wasm.__wbg_guessresult_free(ptr, 1));
+    : new FinalizationRegistry(ptr => wasm.__wbg_gradedletter_free(ptr, 1));
 const WordleGameFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_wordlegame_free(ptr, 1));
 
-function addToExternrefTable0(obj) {
-    const idx = wasm.__externref_table_alloc();
-    wasm.__wbindgen_externrefs.set(idx, obj);
-    return idx;
-}
-
-function _assertChar(c) {
-    if (typeof(c) === 'number' && (c >= 0x110000 || (c >= 0xD800 && c < 0xE000))) throw new Error(`expected a valid Unicode scalar value, found ${c}`);
+function getArrayJsValueFromWasm0(ptr, len) {
+    ptr = ptr >>> 0;
+    const mem = getDataViewMemory0();
+    const result = [];
+    for (let i = ptr; i < ptr + 4 * len; i += 4) {
+        result.push(wasm.__wbindgen_externrefs.get(mem.getUint32(i, true)));
+    }
+    wasm.__externref_drop_slice(ptr, len);
+    return result;
 }
 
 let cachedDataViewMemory0 = null;
@@ -211,15 +193,6 @@ function getUint8ArrayMemory0() {
         cachedUint8ArrayMemory0 = new Uint8Array(wasm.memory.buffer);
     }
     return cachedUint8ArrayMemory0;
-}
-
-function handleError(f, args) {
-    try {
-        return f.apply(this, args);
-    } catch (e) {
-        const idx = addToExternrefTable0(e);
-        wasm.__wbindgen_exn_store(idx);
-    }
 }
 
 function passStringToWasm0(arg, malloc, realloc) {

@@ -1,12 +1,12 @@
 /* tslint:disable */
 /* eslint-disable */
 
-export class GuessResult {
+export class GradedLetter {
     private constructor();
     free(): void;
     [Symbol.dispose](): void;
-    letter: string;
-    state: LetterState;
+    readonly letter: string;
+    readonly state: string;
 }
 
 export enum LetterState {
@@ -23,32 +23,29 @@ export class WordleGame {
     is_game_over(): boolean;
     is_won(): boolean;
     constructor(secret_word: string);
-    submit_guess(guess: string): any;
+    submit_guess(guess: string): GradedLetter[];
 }
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
-    readonly __wbg_get_guessresult_letter: (a: number) => number;
-    readonly __wbg_get_guessresult_state: (a: number) => number;
-    readonly __wbg_guessresult_free: (a: number, b: number) => void;
-    readonly __wbg_set_guessresult_letter: (a: number, b: number) => void;
-    readonly __wbg_set_guessresult_state: (a: number, b: number) => void;
+    readonly __wbg_gradedletter_free: (a: number, b: number) => void;
     readonly __wbg_wordlegame_free: (a: number, b: number) => void;
+    readonly gradedletter_letter: (a: number) => number;
+    readonly gradedletter_state: (a: number) => [number, number];
     readonly wordlegame_get_secret_word: (a: number) => [number, number];
     readonly wordlegame_get_word_length: (a: number) => number;
     readonly wordlegame_is_game_over: (a: number) => number;
     readonly wordlegame_is_won: (a: number) => number;
     readonly wordlegame_new: (a: number, b: number) => number;
-    readonly wordlegame_submit_guess: (a: number, b: number, c: number) => [number, number, number];
-    readonly __wbindgen_malloc: (a: number, b: number) => number;
-    readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
-    readonly __wbindgen_exn_store: (a: number) => void;
-    readonly __externref_table_alloc: () => number;
+    readonly wordlegame_submit_guess: (a: number, b: number, c: number) => [number, number, number, number];
     readonly __wbindgen_externrefs: WebAssembly.Table;
     readonly __wbindgen_free: (a: number, b: number, c: number) => void;
+    readonly __wbindgen_malloc: (a: number, b: number) => number;
+    readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
     readonly __externref_table_dealloc: (a: number) => void;
+    readonly __externref_drop_slice: (a: number, b: number) => void;
     readonly __wbindgen_start: () => void;
 }
 
