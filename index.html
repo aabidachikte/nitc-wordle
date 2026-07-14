@@ -25,77 +25,61 @@
     <script type="module">
         import init, { WordleGame } from './pkg/nitc_wordle.js';
 
-        // Strict 5-letter backup campus targets
-        const FALLBACK_WORDS = [
-            "ragam", "btech", "mtech", "admin", "links", 
-            "login", "hosts", "clubs", "award", "event",
-            "batch", "board", "coder", "excel", "alpha",
-            "dbmsx", "print", "nodes", "bytes", "smart"
-        ];
+        // Single-word fallbacks
+        const FALLBACK_WORDS = ["ragam", "btech", "mtech", "admin", "links", "hosts", "clubs", "event", "batch", "board"];
 
-        // 1. Fetch random article content from the MediaWiki API safely
-        async function fetchCampusWords() {
-            const URL = `https://wiki.fosscell.org/api.php?action=query&generator=random&grnnamespace=0&grnlimit=15&prop=revisions&rvprop=content&format=json&origin=*`;
+        // Pulls exactly 1 random page and extracts the first matching 5-letter word
+        async function fetchSingleCampusWord() {
+            // grnlimit=1 ensures we query only a single random page
+            const URL = `https://wiki.fosscell.org/api.php?action=query&generator=random&grnnamespace=0&grnlimit=1&prop=revisions&rvprop=content&format=json&origin=*`;
 
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 3000); 
+            const timeoutId = setTimeout(() => controller.abort(), 2500); 
 
             try {
                 const response = await fetch(URL, { signal: controller.signal });
                 clearTimeout(timeoutId);
 
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
                 const data = await response.json();
-                let validWords = [];
 
                 if (data && data.query && data.query.pages) {
                     for (const pageId in data.query.pages) {
                         const page = data.query.pages[pageId];
-                        let pageText = page.title || "";
+                        let pageText = (page.title || "") + " ";
 
                         if (page.revisions && page.revisions[0]) {
                             const rev = page.revisions[0];
-                            const content = rev["*"] || rev.content || "";
-                            pageText += " " + content;
+                            pageText += rev["*"] || rev.content || "";
                         }
 
+                        // Tokenize and hunt for the first valid 5-letter word
                         const words = pageText.split(/[\s_]+/);
                         for (let i = 0; i < words.length; i++) {
                             const cleanWord = words[i].replace(/[^a-zA-Z]/g, "").toLowerCase();
-                            // Strict structural change: Force exact match length of 5 
                             if (cleanWord.length === 5) {
-                                validWords.push(cleanWord);
+                                console.log(`🎯 Found matching word on page: "${cleanWord.toUpperCase()}"`);
+                                return cleanWord; 
                             }
                         }
                     }
                 }
-
-                validWords = [...new Set(validWords)];
-                console.log("🎯 Live Wiki 5-Letter Words Extracted:", validWords);
-
-                return validWords.length === 0 ? FALLBACK_WORDS : validWords;
+                throw new Error("No 5-letter words found on this page.");
             } catch (err) {
                 clearTimeout(timeoutId);
-                console.warn("⚠️ API parsing error. Using backup list.", err);
-                return FALLBACK_WORDS;
+                const fallback = FALLBACK_WORDS[Math.floor(Math.random() * FALLBACK_WORDS.length)];
+                console.warn("⚠️ Single fetch fallback used:", fallback, `(${err.message})`);
+                return fallback;
             }
-        }
-
-        function pickRandomWord(wordList) {
-            const selectedIndex = Math.floor(Math.random() * wordList.length);
-            const secretWord = wordList[selectedIndex];
-            console.log(`🎲 Active Match Word: "${secretWord.toUpperCase()}"`);
-            return secretWord;
         }
 
         async function run() {
             try {
                 await init();
-                const wordPool = await fetchCampusWords();
-                const secretWord = pickRandomWord(wordPool);
+                // Fetch just one word
+                const secretWord = await fetchSingleCampusWord();
+                console.log(`🎲 Active Match Word: "${secretWord.toUpperCase()}"`);
 
                 const game = new WordleGame(secretWord);
                 const wordLength = game.get_word_length();
