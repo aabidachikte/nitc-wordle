@@ -1,123 +1,150 @@
+```javascript
+// =============================================================================
+//                     NITC WORDLE: SYSTEM PSEUDOCODE
+// =============================================================================
 
-    ================================================================================
-                     NITC WORDLE: SYSTEM PSEUDOCODE
-    ================================================================================
-
-     // Global Configurations & Safety Nets
-    GLOBAL CONSTANT FALLBACK_WORDS = ["ragam", "btech", "mtech", "links", "hosts", "clubs", "event", "batch", "board", "smart"]
-    GLOBAL CONSTANT STATIC_BLACKLIST = ["image", "cargo", "thumb", "width", "align", "files", "photo", "notes", "admin", "thats"]
-    GLOBAL CONSTANT ADMIN_PASSWORD = "opensesame"
+// Global Configurations & Safety Nets
+const FALLBACK_WORDS = ["ragam", "btech", "mtech", "links", "hosts", "clubs", "event", "batch", "board", "smart"];
+const STATIC_BLACKLIST = ["image", "cargo", "thumb", "width", "align", "files", "photo", "notes", "admin", "thats"];
+const ADMIN_PASSWORD = "opensesame";
 
 
-    // =============================================================================
-    // PHASE 1: SINGLE-QUERY MULTI-PAGE WORD GENERATION & FILTERING PIPELINE
-    // =============================================================================
-      FUNCTION fetchSingleCampusWord():
+// =============================================================================
+// PHASE 1: SINGLE-QUERY MULTI-PAGE WORD GENERATION & FILTERING PIPELINE
+// =============================================================================
+async function fetchSingleCampusWord() {
     // Step 1: Initialize local client-side and static blacklists
-    local_blacklist = load_from_local_storage("nitc_wordle_blacklist")
-    active_blacklist = STATIC_BLACKLIST + local_blacklist
+    const local_blacklist = load_from_local_storage("nitc_wordle_blacklist");
+    const active_blacklist = [...STATIC_BLACKLIST, ...local_blacklist];
     
-    TRY:
+    try {
         // Step 2: Fetch 5 random pages in 1 network request (grnlimit=5) to minimize server traffic
-        api_response = fetch("https://wiki.fosscell.org/api.php?action=query&generator=random&grnnamespace=0&grnlimit=5&prop=revisions&rvprop=content&format=json&origin=*")
-        pages = api_response.query.pages
-        master_word_pool = []
+        const api_url = "[https://wiki.fosscell.org/api.php?action=query&generator=random&grnnamespace=0&grnlimit=5&prop=revisions&rvprop=content&format=json&origin=](https://wiki.fosscell.org/api.php?action=query&generator=random&grnnamespace=0&grnlimit=5&prop=revisions&rvprop=content&format=json&origin=)*";
+        const api_response = await fetch(api_url);
+        const pages = api_response.query.pages;
+        const master_word_pool = [];
         
-        FOR EACH page IN pages:
+        for (const page of pages) {
             // Guard A: Namespace verification (Must be main article namespace)
-            IF page.namespace != 0:
-                CONTINUE (skip page)
+            if (page.namespace !== 0) {
+                continue; // skip page
+            }
                 
             // Guard B: Title structural verification (No subpages, users, categories, or templates)
-            title_lower = page.title.to_lowercase()
-            IF title_lower starts with "user:" OR "category:" OR "template:" 
-               OR title_lower contains "user" OR "member" OR title_lower contains "/":
-                CONTINUE (skip page)
+            const title_lower = page.title.toLowerCase();
+            if (
+                title_lower.startsWith("user:") || 
+                title_lower.startsWith("category:") || 
+                title_lower.startsWith("template:") || 
+                title_lower.includes("user") || 
+                title_lower.includes("member") || 
+                title_lower.includes("/")
+            ) {
+                continue; // skip page
+            }
                 
             // Guard C: Multi-word name verification (e.g., skips "First Middle Last" bios)
-            IF count_words(page.title) >= 3:
-                CONTINUE (skip page)
+            if (count_words(page.title) >= 3) {
+                continue; // skip page
+            }
                 
             // Guard D: Source code metadata verification (No personal profiles or rosters)
-            raw_content = page.revisions[0].content
-            content_lower = raw_content.to_lowercase()
-            IF content_lower contains "category:members" OR "category:people" OR "{{member" OR "{{profile":
-                CONTINUE (skip page)
+            const raw_content = page.revisions[0].content;
+            const content_lower = raw_content.toLowerCase();
+            if (
+                content_lower.includes("category:members") || 
+                content_lower.includes("category:people") || 
+                content_lower.includes("{{member") || 
+                content_lower.includes("{{profile")
+            ) {
+                continue; // skip page
+            }
                 
             // Step 3: Tokenize, sanitize, and extract valid 5-letter candidate words
-            page_tokens = split_text_into_individual_words(page.title + " " + raw_content)
-            FOR EACH token IN page_tokens:
-                clean_word = remove_special_characters(token).to_lowercase()
+            const page_tokens = split_text_into_individual_words(page.title + " " + raw_content);
+            for (const token of page_tokens) {
+                const clean_word = remove_special_characters(token).toLowerCase();
                 
-                IF length_of(clean_word) == 5 AND clean_word NOT IN active_blacklist:
-                    master_word_pool.add(clean_word)
+                if (clean_word.length === 5 && !active_blacklist.includes(clean_word)) {
+                    master_word_pool.push(clean_word);
+                }
+            }
+        }
                     
         // Step 4: Random selection from the filtered multi-page pool
-        IF size_of(master_word_pool) > 0:
-            RETURN select_random_element(master_word_pool)
-        ELSE:
-            THROW ERROR ("No clean words available on these pages")
+        if (master_word_pool.length > 0) {
+            return select_random_element(master_word_pool);
+        } else {
+            throw new Error("No clean words available on these pages");
+        }
             
-    CATCH ERROR (network timeout, api error, or empty master pool):
+    } catch (error) {
         // Safety Fallback (Guarantees immediate game loading)
-        RETURN select_random_element(FALLBACK_WORDS)
+        return select_random_element(FALLBACK_WORDS);
+    }
+}
 
 
-    // =============================================================================
-    // PHASE 2: CORE GAMEPLAY LOOP & ADMIN CONTROL INTERACTION
-    // =============================================================================
-    FUNCTION runWordleGame():
+// =============================================================================
+// PHASE 2: CORE GAMEPLAY LOOP & ADMIN CONTROL INTERACTION
+// =============================================================================
+function runWordleGame() {
     // Step 1: Initialize game and boot WebAssembly game state engine
-    secret_word = fetchSingleCampusWord()
-    wasm_engine = Initialize_WordleGame_WASM(secret_word)
-    current_row = 0
-    max_rows = 6
+    const secret_word = fetchSingleCampusWord();
+    const wasm_engine = Initialize_WordleGame_WASM(secret_word);
+    let current_row = 0;
+    const max_rows = 6;
     
     // Step 2: Establish Admin-exclusive bypass controls
-    IF URL_parameters contain "admin=" + ADMIN_PASSWORD:
-        SHOW "Block & Skip Word" button
+    if (URL_parameters.includes("admin=" + ADMIN_PASSWORD)) {
+        show_element("Block & Skip Word button");
         
-        ON "Block & Skip Word" button click:
+        on_click("Block & Skip Word button", () => {
             // Persist the banned word locally to the admin's browser
-            save_to_local_storage("nitc_wordle_blacklist", secret_word)
+            save_to_local_storage("nitc_wordle_blacklist", secret_word);
             
             // Format and export the updated blocklist array for global hardcoding in index.html
-            local_blacklist = load_from_local_storage("nitc_wordle_blacklist")
-            merged_list = unique_elements(STATIC_BLACKLIST + local_blacklist)
-            PRINT_TO_SCREEN_FOR_COPY(merged_list)
+            const local_blacklist = load_from_local_storage("nitc_wordle_blacklist");
+            const merged_list = unique_elements([...STATIC_BLACKLIST, ...local_blacklist]);
+            print_to_screen_for_copy(merged_list);
             
             // Reload the page instantly to fetch a fresh target word
-            reload_current_webpage()
+            reload_current_webpage();
+        });
+    }
             
     // Step 3: Main Player Interaction Loop
-    ON user_presses_enter_key_in_input_field:
-        user_guess = read_input_field_value().to_lowercase()
+    on_submit_guess(() => {
+        const user_guess = read_input_field_value().toLowerCase();
         
-        IF length_of(user_guess) != 5:
-            SHOW_UI_MESSAGE("Word must be exactly 5 letters")
-            RETURN
+        if (user_guess.length !== 5) {
+            show_ui_message("Word must be exactly 5 letters");
+            return;
+        }
             
-        TRY:
+        try {
             // Run matching algorithm inside compiled WebAssembly
-            letter_evaluations = wasm_engine.submit_guess(user_guess)
+            const letter_evaluations = wasm_engine.submit_guess(user_guess);
             
             // Render results to screen
-            render_grid_row_tiles(current_row, letter_evaluations)
-            clear_input_field()
+            render_grid_row_tiles(current_row, letter_evaluations);
+            clear_input_field();
             
             // Evaluate game termination conditions
-            IF wasm_engine.is_won():
-                SHOW_UI_MESSAGE("🎉 You Won!")
-                disable_input_field()
-                HIDE "Block & Skip Word" button
+            if (wasm_engine.is_won()) {
+                show_ui_message("🎉 You Won!");
+                disable_input_field();
+                hide_element("Block & Skip Word button");
+            } else if (wasm_engine.is_game_over() || current_row === (max_rows - 1)) {
+                show_ui_message("Game Over! The word was: " + secret_word.toUpperCase());
+                disable_input_field();
+                hide_element("Block & Skip Word button");
+            } else {
+                current_row++;
+            }
                 
-            ELSE IF wasm_engine.is_game_over() (current_row == max_rows - 1):
-                SHOW_UI_MESSAGE("Game Over! The word was: " + secret_word.to_uppercase())
-                disable_input_field()
-                HIDE "Block & Skip Word" button
-                
-            ELSE:
-                current_row = current_row + 1
-                
-        CATCH ERROR (invalid guess dictionary validation error):
-            SHOW_UI_MESSAGE(error_message_from_engine)
+        } catch (error) {
+            show_ui_message(error.message);
+        }
+    });
+}
