@@ -35,7 +35,55 @@
     </style>
 </head>
 <body>
+<!-- How to Play Modal -->
+<div id="help-modal" class="modal">
+    <div class="modal-content">
+        <span class="close-btn" onclick="closeHelpModal()">&times;</span>
+        
+        <h2>How To Play</h2>
+        <h3>Guess the Wordle in 6 tries.</h3>
+        
+        <ul>
+            <li>Each guess must be a valid word (5 to 8 letters).</li>
+            <li>The color of the tiles will change to show how close your guess was to the word.</li>
+        </ul>
 
+        <div class="examples-section">
+            <p class="example-title"><strong>Examples</strong></p>
+            
+            <!-- Example 1: Green -->
+            <div class="example-row">
+                <div class="tile correct">W</div>
+                <div class="tile">O</div>
+                <div class="tile">R</div>
+                <div class="tile">D</div>
+                <div class="tile">Y</div>
+            </div>
+            <p class="example-desc"><strong>W</strong> is in the word and in the correct spot.</p>
+
+            <!-- Example 2: Yellow -->
+            <div class="example-row">
+                <div class="tile">L</div>
+                <div class="tile present">I</div>
+                <div class="tile">G</div>
+                <div class="tile">H</div>
+                <div class="tile">T</div>
+            </div>
+            <p class="example-desc"><strong>I</strong> is in the word but in the wrong spot.</p>
+
+            <!-- Example 3: Grey -->
+            <div class="example-row">
+                <div class="tile">R</div>
+                <div class="tile">O</div>
+                <div class="tile">G</div>
+                <div class="tile absent">U</div>
+                <div class="tile">E</div>
+            </div>
+            <p class="example-desc"><strong>U</strong> is not in the word in any spot.</p>
+        </div>
+    </div>
+</div>
+    
     <h1>NITC Wordle</h1>
     <div id="grid"></div>
     
