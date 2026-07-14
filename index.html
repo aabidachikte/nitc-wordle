@@ -105,7 +105,7 @@
             window.location.reload(); 
         }
 
-        // Pulls exactly 5 random pages in 1 query, filters them, and picks 1 random word
+// Pulls random pages in 1 query, filters them, and picks 1 random word using regex
         async function fetchSingleCampusWord() {
             const URL = `https://wiki.fosscell.org/api.php?action=query&generator=random&grnnamespace=0&grnlimit=5&prop=revisions&rvprop=content&format=json&origin=*`;
 
@@ -139,8 +139,8 @@
                             lowercaseTitle.startsWith("user talk:") ||
                             lowercaseTitle.startsWith("category:") ||
                             lowercaseTitle.startsWith("template:") ||
-                            lowercaseTitle.includes("user") ||       
-                            lowercaseTitle.includes("member") ||     
+                            lowercaseTitle.startsWith("user") ||       
+                            lowercaseTitle.startsWith("member") ||     
                             title.includes("/")                      
                         ) {
                             continue;
@@ -171,17 +171,18 @@
                             continue; 
                         }
 
-                        // 5. Gather all eligible words using the regex pattern (5 to 8 letter words)
-                const regexPattern = /[a-zA-Z]{5,8}/g;
-                const matchedWords = pageText.match(regexPattern);
+                        // 5. Gather all eligible words using regex (5 to 8 letter alphabetical words)
+                        const regexPattern = /[a-zA-Z]{5,8}/g;
+                        const matchedWords = pageText.match(regexPattern);
 
-                if (matchedWords) {
-                    for (const rawWord of matchedWords) {
-                    const cleanWord = rawWord.toLowerCase();
-        
-                        // Skip words that are in our active blacklist
-                    if (!activeBlacklist.includes(cleanWord)) {
-                    masterWordPool.push(cleanWord);
+                        if (matchedWords) {
+                            for (const rawWord of matchedWords) {
+                                const cleanWord = rawWord.toLowerCase();
+                                
+                                // Skip words that are in our active blacklist
+                                if (!activeBlacklist.includes(cleanWord)) {
+                                    masterWordPool.push(cleanWord);
+                                }
                             }
                         }
                     }
@@ -194,7 +195,7 @@
                     return selectedWord;
                 }
 
-                throw new Error("No clean 5-letter words found on any of the queried pages.");
+                throw new Error("No clean 5-to-8 letter words found on any of the queried pages.");
             } catch (err) {
                 clearTimeout(timeoutId);
                 const fallback = FALLBACK_WORDS[Math.floor(Math.random() * FALLBACK_WORDS.length)];
