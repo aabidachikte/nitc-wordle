@@ -171,13 +171,17 @@
                             continue; 
                         }
 
-                        // 5. Gather all eligible words
-                        const words = pageText.split(/[\s_]+/);
-                        for (let i = 0; i < words.length; i++) {
-                            const cleanWord = words[i].replace(/[^a-zA-Z]/g, "").toLowerCase();
-                            
-                            if (cleanWord.length === 5 && !activeBlacklist.includes(cleanWord)) {
-                                masterWordPool.push(cleanWord);
+                        // 5. Gather all eligible words using the regex pattern (5 to 8 letter words)
+                const regexPattern = /[a-zA-Z]{5,8}/g;
+                const matchedWords = pageText.match(regexPattern);
+
+                if (matchedWords) {
+                    for (const rawWord of matchedWords) {
+                    const cleanWord = rawWord.toLowerCase();
+        
+                        // Skip words that are in our active blacklist
+                    if (!activeBlacklist.includes(cleanWord)) {
+                    masterWordPool.push(cleanWord);
                             }
                         }
                     }
