@@ -67,21 +67,41 @@
                             lowercaseTitle.startsWith("user talk:") ||
                             lowercaseTitle.startsWith("category:") ||
                             lowercaseTitle.startsWith("template:") ||
-                            lowercaseTitle.includes("user") ||       // Catch-all for "user" profiles
-                            lowercaseTitle.includes("member") ||     // Discard member roster pages
-                            title.includes("/")                      // Discard subpages entirely
+                            lowercaseTitle.includes("user") ||       
+                            lowercaseTitle.includes("member") ||     
+                            title.includes("/")                      
                         ) {
                             throw new Error(`Skipped user/profile page: ${title}`);
                         }
 
+                        // 3. STAGE 3 BLOCKS: Check for Name-like patterns in the title (e.g. "First Middle Last")
+                        const titleWords = title.split(/\s+/);
+                        if (titleWords.length >= 3) {
+                            throw new Error(`Skipped page with multi-word name-like title: ${title}`);
+                        }
+
                         let pageText = title + " ";
+                        let rawContent = "";
 
                         if (page.revisions && page.revisions[0]) {
                             const rev = page.revisions[0];
-                            pageText += rev["*"] || rev.content || "";
+                            rawContent = rev["*"] || rev.content || "";
+                            pageText += rawContent;
                         }
 
-                        // 3. Find ALL valid, non-blacklisted 5-letter words on the page
+                        // 4. STAGE 4 BLOCKS: Scan the page source content for member categories or biography templates
+                        const lowercaseContent = rawContent.toLowerCase();
+                        if (
+                            lowercaseContent.includes("category:members") ||
+                            lowercaseContent.includes("category:people") ||
+                            lowercaseContent.includes("category:contributors") ||
+                            lowercaseContent.includes("{{member") ||
+                            lowercaseContent.includes("{{profile")
+                        ) {
+                            throw new Error(`Skipped main-namespace member profile: ${title}`);
+                        }
+
+                        // 5. Find ALL valid, non-blacklisted 5-letter words on the page
                         const pageWords = [];
                         const words = pageText.split(/[\s_]+/);
                         
@@ -93,7 +113,7 @@
                             }
                         }
 
-                        // 4. Pick a RANDOM word from the gathered pool to avoid top-of-page bias
+                        // 6. Pick a RANDOM word from the gathered pool to avoid top-of-page bias
                         if (pageWords.length > 0) {
                             const randomIndex = Math.floor(Math.random() * pageWords.length);
                             const selectedWord = pageWords[randomIndex];
@@ -107,7 +127,7 @@
             } catch (err) {
                 clearTimeout(timeoutId);
                 const fallback = FALLBACK_WORDS[Math.floor(Math.random() * FALLBACK_WORDS.length)];
-                console.warn("⚠️ Userpage filter active or fetch failed. Fallback used:", fallback, `(${err.message})`);
+                console.warn("⚠️ Profile filter active or fetch failed. Fallback used:", fallback, `(${err.message})`);
                 return fallback;
             }
         }
