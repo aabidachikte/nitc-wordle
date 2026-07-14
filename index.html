@@ -25,8 +25,14 @@
     <script type="module">
         import init, { WordleGame } from './pkg/nitc_wordle.js';
 
-        // Single-word fallbacks if no clean words are found on a page
-        const FALLBACK_WORDS = ["ragam", "btech", "mtech", "links", "hosts", "clubs", "event", "batch", "board", "smart"];
+        // Expanded fallback dictionary of 50 campus, engineering, and student life words
+        const FALLBACK_WORDS = [
+            "ragam", "btech", "mtech", "links", "hosts", "clubs", "event", "batch", "board", "smart",
+            "tathv", "messx", "grade", "exams", "class", "study", "paper", "score", "major", "minor",
+            "bytes", "codes", "nodes", "stack", "queue", "array", "graph", "trees", "logic", "input",
+            "react", "rusty", "learn", "teach", "coach", "draft", "group", "teams", "bench", "chair",
+            "chalk", "books", "tests", "rules", "gates", "omega", "alpha", "laser", "radar", "solar"
+        ];
 
         // Filter out layout syntax, common pronouns, structural wiki nouns, and prepositions
         const BLACKLIST = [
@@ -74,7 +80,7 @@
                             throw new Error(`Skipped user/profile page: ${title}`);
                         }
 
-                        // 3. STAGE 3 BLOCKS: Check for Name-like patterns in the title (e.g. "First Middle Last")
+                        // 3. STAGE 3 BLOCKS: Check for Name-like patterns in the title
                         const titleWords = title.split(/\s+/);
                         if (titleWords.length >= 3) {
                             throw new Error(`Skipped page with multi-word name-like title: ${title}`);
