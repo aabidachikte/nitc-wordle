@@ -25,17 +25,17 @@
     <script type="module">
         import init, { WordleGame } from './pkg/nitc_wordle.js';
 
-        // Single-word fallbacks
+        // Single-word fallbacks if no clean words are found on a page
         const FALLBACK_WORDS = ["ragam", "btech", "mtech", "links", "hosts", "clubs", "event", "batch", "board", "smart"];
 
-        // Expanded blacklist to filter out metadata, common pronouns, and non-topic words
+        // Filter out layout syntax, common pronouns, structural wiki nouns, and prepositions
         const BLACKLIST = [
             "image", "cargo", "thumb", "width", "align", "files", "photo",
             "notes", "admin", "thats", "which", "there", "their", "about", 
-            "would", "could", "write", "print", "under", "other"
+            "would", "could", "write", "print", "under", "other", "order"
         ];
 
-        // Pulls exactly 1 random page and extracts the first matching 5-letter word
+        // Pulls exactly 1 random page and extracts a random 5-letter word from its pool
         async function fetchSingleCampusWord() {
             const URL = `https://wiki.fosscell.org/api.php?action=query&generator=random&grnnamespace=0&grnlimit=1&prop=revisions&rvprop=content&format=json&origin=*`;
 
@@ -60,16 +60,24 @@
                             pageText += rev["*"] || rev.content || "";
                         }
 
-                        // Tokenize and hunt for the first valid 5-letter word
+                        // 1. Find ALL valid, non-blacklisted 5-letter words on the page
+                        const pageWords = [];
                         const words = pageText.split(/[\s_]+/);
+                        
                         for (let i = 0; i < words.length; i++) {
                             const cleanWord = words[i].replace(/[^a-zA-Z]/g, "").toLowerCase();
                             
-                            // Check if word is 5 letters long AND is not blacklisted
                             if (cleanWord.length === 5 && !BLACKLIST.includes(cleanWord)) {
-                                console.log(`🎯 Found matching word on page: "${cleanWord.toUpperCase()}"`);
-                                return cleanWord; 
+                                pageWords.push(cleanWord);
                             }
+                        }
+
+                        // 2. Pick a RANDOM word from the gathered pool to avoid top-of-page bias
+                        if (pageWords.length > 0) {
+                            const randomIndex = Math.floor(Math.random() * pageWords.length);
+                            const selectedWord = pageWords[randomIndex];
+                            console.log(`🎯 Randomly selected from ${pageWords.length} page words: "${selectedWord.toUpperCase()}"`);
+                            return selectedWord;
                         }
                     }
                 }
